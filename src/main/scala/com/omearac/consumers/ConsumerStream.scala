@@ -28,7 +28,6 @@ trait ConsumerStream extends AkkaStreams with EventSourcing {
         Sink.actorRefWithAck(consumerActorSink, "STREAM_INIT", "OK", "STREAM_DONE")
     }
 
-
     def createStreamSource(consumerProperties: Map[String,String])  = {
         val kafkaMBAddress = consumerProperties("bootstrap-servers")
         val groupID = consumerProperties("groupId")
@@ -40,7 +39,6 @@ trait ConsumerStream extends AkkaStreams with EventSourcing {
 
         Consumer.committableSource(consumerSettings, Subscriptions.topics(topicSubscription))
     }
-
 
     def createStreamFlow[msgType: Conversion] = {
         Flow[ConsumerMessage.CommittableMessage[Array[Byte], String]]
@@ -59,11 +57,9 @@ trait ConsumerStream extends AkkaStreams with EventSourcing {
             .map(msgGroup => msgGroup._2)
     }
 
-
     def commitOffsetsToKafka[msgType](tupleOfCommitOffsetAndMsgs: (ConsumerMessage.CommittableOffsetBatch, ArrayBuffer[msgType])) = Future {
         (tupleOfCommitOffsetAndMsgs._1.commitScaladsl(), tupleOfCommitOffsetAndMsgs._2)
     }
-
 
     def publishConversionErrors[msgType](tupleOfCommitOffsetAndConversionResults: (ConsumerMessage.CommittableOffset, Either[FailedMessageConversion,msgType]))
     : Either[Unit,(ConsumerMessage.CommittableOffset,msgType)] = {

@@ -18,11 +18,9 @@ trait ProducerStream extends AkkaStreams with EventSourcing {
     implicit val system: ActorSystem
     def self: ActorRef
 
-
     def createStreamSource[msgType] = {
         Source.queue[msgType](Int.MaxValue,OverflowStrategy.backpressure)
     }
-
 
     def createStreamSink(producerProperties: Map[String, String]) = {
         val kafkaMBAddress = producerProperties("bootstrap-servers")
@@ -30,7 +28,6 @@ trait ProducerStream extends AkkaStreams with EventSourcing {
 
         Producer.plainSink(producerSettings)
     }
-
 
     def createStreamFlow[msgType: Conversion](producerProperties: Map[String, String]) = {
         val numberOfPartitions = producerProperties("num.partitions").toInt -1
