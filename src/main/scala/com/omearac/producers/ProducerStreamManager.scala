@@ -1,7 +1,7 @@
 package com.omearac.producers
 
 import akka.actor._
-import com.omearac.producers.ProducerStreamManager.Messages._
+import com.omearac.producers.ProducerStreamManager.InitializeProducerStream
 import com.omearac.settings.Settings
 import com.omearac.shared.EventMessages.ActivatedProducerStream
 import com.omearac.shared.JsonMessageConversion.Conversion
@@ -16,45 +16,46 @@ import com.omearac.shared.KafkaMessages.{ExampleAppEvent, KafkaMessage}
   */
 
 object ProducerStreamManager {
-    object Messages {
-        //CommandMessage
-        case class InitializeProducerStream(producerActorRef: ActorRef, msgType: Any)
-    }
+
+  //CommandMessage
+  case class InitializeProducerStream(producerActorRef: ActorRef, msgType: Any)
+
+  def props: Props = Props(new ProducerStreamManager)
 }
 
 class ProducerStreamManager extends Actor with ProducerStream {
-    implicit val system = context.system
+  implicit val system = context.system
 
-    //Get Kafka Producer Config Settings
-    val settings = Settings(system).KafkaProducers
+  //Get Kafka Producer Config Settings
+  val settings = Settings(system).KafkaProducers
 
-    //Edit this receive method with any new Streamed message types
-    def receive: Receive = {
-        case InitializeProducerStream(producerActorRef, KafkaMessage) => {
+  //Edit this receive method with any new Streamed message types
+  def receive: Receive = {
+    case InitializeProducerStream(producerActorRef, KafkaMessage) => {
 
-            //Get producer properties
-            val producerProperties = settings.KafkaProducerInfo("KafkaMessage")
-            startProducerStream[KafkaMessage](producerActorRef, producerProperties)
-        }
-        case InitializeProducerStream(producerActorRef, ExampleAppEvent) => {
-
-            //Get producer properties
-            val producerProperties = settings.KafkaProducerInfo("ExampleAppEvent")
-            startProducerStream[ExampleAppEvent](producerActorRef, producerProperties)
-        }
-        case other => println(s"Producer Stream Manager got unknown message: $other")
+      //Get producer properties
+      val producerProperties = settings.KafkaProducerInfo("KafkaMessage")
+      startProducerStream[KafkaMessage](producerActorRef, producerProperties)
     }
+    case InitializeProducerStream(producerActorRef, ExampleAppEvent) => {
 
-
-    def startProducerStream[msgType: Conversion](producerActorSource: ActorRef, producerProperties: Map[String,String])={
-        val streamSource = createStreamSource[msgType]
-        val streamFlow = createStreamFlow[msgType](producerProperties)
-        val streamSink =createStreamSink(producerProperties)
-        val producerStream = streamSource.via(streamFlow).to(streamSink).run()
-
-        //Send the completed stream reference to the actor who wants to publish to it
-        val kafkaTopic = producerProperties("publish-topic")
-        producerActorSource ! ActivatedProducerStream(producerStream, kafkaTopic)
-        publishLocalEvent(ActivatedProducerStream(producerStream, kafkaTopic))
+      //Get producer properties
+      val producerProperties = settings.KafkaProducerInfo("ExampleAppEvent")
+      startProducerStream[ExampleAppEvent](producerActorRef, producerProperties)
     }
+    case other => println(s"Producer Stream Manager got unknown message: $other")
+  }
+
+
+  def startProducerStream[msgType: Conversion](producerActorSource: ActorRef, producerProperties: Map[String, String]) = {
+    val streamSource = createStreamSource[msgType]
+    val streamFlow = createStreamFlow[msgType](producerProperties)
+    val streamSink = createStreamSink(producerProperties)
+    val producerStream = streamSource.via(streamFlow).to(streamSink).run()
+
+    //Send the completed stream reference to the actor who wants to publish to it
+    val kafkaTopic = producerProperties("publish-topic")
+    producerActorSource ! ActivatedProducerStream(producerStream, kafkaTopic)
+    publishLocalEvent(ActivatedProducerStream(producerStream, kafkaTopic))
+  }
 }

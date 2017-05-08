@@ -1,6 +1,6 @@
 package com.omearac.producers
 
-import akka.actor.Actor
+import akka.actor.{Actor, Props}
 import akka.event.Logging
 import akka.stream.scaladsl.SourceQueueWithComplete
 import com.omearac.shared.EventMessages.ActivatedProducerStream
@@ -16,37 +16,41 @@ import com.omearac.shared.KafkaMessages.ExampleAppEvent
   */
 
 object EventProducer {
+
+  def props: Props = Props(new EventProducer)
 }
 
 class EventProducer extends Actor with EventSourcing {
-    import context._
-    implicit val system = context.system
-    val log = Logging(system, this.getClass.getName)
 
-    var producerStream: SourceQueueWithComplete[Any] = null
-    val subscribedMessageTypes = Seq(classOf[ExampleAppEvent])
+  import context._
 
-    override def preStart(): Unit = {
-        super.preStart()
-        subscribedMessageTypes.foreach(system.eventStream.subscribe(self,_))
-    }
+  implicit val system = context.system
+  val log = Logging(system, this.getClass.getName)
 
-    override def postStop(): Unit = {
-        subscribedMessageTypes.foreach(system.eventStream.unsubscribe(self,_))
-        super.postStop()
-    }
+  var producerStream: SourceQueueWithComplete[Any] = null
+  val subscribedMessageTypes = Seq(classOf[ExampleAppEvent])
 
-    def receive: Receive = {
-        case ActivatedProducerStream(streamRef,_) =>
-            producerStream = streamRef
-            become(publishEvent)
+  override def preStart(): Unit = {
+    super.preStart()
+    subscribedMessageTypes.foreach(system.eventStream.subscribe(self, _))
+  }
 
-        case msg: ExampleAppEvent => if (producerStream == null) self ! msg else producerStream.offer(msg)
-        case other => log.error("EventProducer got the unknown message while in idle: " + other)
-    }
+  override def postStop(): Unit = {
+    subscribedMessageTypes.foreach(system.eventStream.unsubscribe(self, _))
+    super.postStop()
+  }
 
-    def publishEvent: Receive = {
-        case msg:ExampleAppEvent => producerStream.offer(msg)
-        case other => log.error("EventProducer got the unknown message while producing: " + other)
-    }
+  def receive: Receive = {
+    case ActivatedProducerStream(streamRef, _) =>
+      producerStream = streamRef
+      become(publishEvent)
+
+    case msg: ExampleAppEvent => if (producerStream == null) self ! msg else producerStream.offer(msg)
+    case other => log.error("EventProducer got the unknown message while in idle: " + other)
+  }
+
+  def publishEvent: Receive = {
+    case msg: ExampleAppEvent => producerStream.offer(msg)
+    case other => log.error("EventProducer got the unknown message while producing: " + other)
+  }
 }
