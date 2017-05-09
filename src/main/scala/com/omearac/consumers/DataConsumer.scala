@@ -2,8 +2,8 @@ package com.omearac.consumers
 
 import akka.actor._
 import akka.event.Logging
-import com.omearac.consumers.ConsumerStreamManager.Messages.{InitializeConsumerStream, TerminateConsumerStream}
-import com.omearac.consumers.DataConsumer.Messages._
+import com.omearac.consumers.ConsumerStreamManager.{InitializeConsumerStream, TerminateConsumerStream}
+import com.omearac.consumers.DataConsumer.{ConsumerActorReply, ManuallyInitializeStream, ManuallyTerminateStream}
 import com.omearac.settings.Settings
 import com.omearac.shared.EventMessages.ActivatedConsumerStream
 import com.omearac.shared.EventSourcing
@@ -22,60 +22,62 @@ import scala.collection.mutable.ArrayBuffer
   */
 
 object DataConsumer {
-    object Messages {
-        //Command Messages
-        case object ManuallyInitializeStream
-        case object ManuallyTerminateStream
 
-        //Document Messages
-        case class ConsumerActorReply(message: String)
-    }
+  //Command Messages
+  case object ManuallyInitializeStream
+
+  case object ManuallyTerminateStream
+
+  //Document Messages
+  case class ConsumerActorReply(message: String)
+
+  def props: Props = Props(new DataConsumer)
 }
 
 class DataConsumer extends Actor with EventSourcing {
-    implicit val system = context.system
-    val log = Logging(system, this.getClass.getName)
+  implicit val system = context.system
+  val log = Logging(system, this.getClass.getName)
 
-    //Once stream is started by manager, we save the actor ref of the manager
-    var consumerStreamManager: ActorRef = null
+  //Once stream is started by manager, we save the actor ref of the manager
+  var consumerStreamManager: ActorRef = null
 
-    //Get Kafka Topic
-    val kafkaTopic = Settings(system).KafkaConsumers.KafkaConsumerInfo("KafkaMessage")("subscription-topic")
+  //Get Kafka Topic
+  val kafkaTopic = Settings(system).KafkaConsumers.KafkaConsumerInfo("KafkaMessage")("subscription-topic")
 
-    def receive: Receive = {
+  def receive: Receive = {
 
-        case ActivatedConsumerStream(_) => consumerStreamManager = sender()
+    case ActivatedConsumerStream(_) => consumerStreamManager = sender()
 
-        case "STREAM_INIT" =>
-            sender() ! "OK"
-            println("Data Consumer entered consuming state!")
-            context.become(consumingData)
+    case "STREAM_INIT" =>
+      sender() ! "OK"
+      println("Data Consumer entered consuming state!")
+      context.become(consumingData)
 
-        case ManuallyTerminateStream => sender() ! ConsumerActorReply("Data Consumer Stream Already Stopped")
+    case ManuallyTerminateStream => sender() ! ConsumerActorReply("Data Consumer Stream Already Stopped")
 
-        case ManuallyInitializeStream =>
-            consumerStreamManager ! InitializeConsumerStream(self, KafkaMessage)
-            sender() ! ConsumerActorReply("Data Consumer Stream Started")
+    case ManuallyInitializeStream =>
+      consumerStreamManager ! InitializeConsumerStream(self, KafkaMessage)
+      sender() ! ConsumerActorReply("Data Consumer Stream Started")
 
-        case other => log.error("Data Consumer got unknown message while in idle:" + other )
-    }
+    case other => log.error("Data Consumer got unknown message while in idle:" + other)
+  }
 
-    def consumingData: Receive = {
-        case ActivatedConsumerStream(_) => consumerStreamManager = sender()
+  def consumingData: Receive = {
+    case ActivatedConsumerStream(_) => consumerStreamManager = sender()
 
-        case consumerMessageBatch: ArrayBuffer[_] =>
-            sender() ! "OK"
-            consumerMessageBatch.foreach(println)
+    case consumerMessageBatch: ArrayBuffer[_] =>
+      sender() ! "OK"
+      consumerMessageBatch.foreach(println)
 
-        case "STREAM_DONE" =>
-            context.become(receive)
+    case "STREAM_DONE" =>
+      context.become(receive)
 
-        case ManuallyInitializeStream => sender() ! ConsumerActorReply("Data Consumer Already Started")
+    case ManuallyInitializeStream => sender() ! ConsumerActorReply("Data Consumer Already Started")
 
-        case ManuallyTerminateStream =>
-            consumerStreamManager ! TerminateConsumerStream(kafkaTopic)
-            sender() ! ConsumerActorReply("Data Consumer Stream Stopped")
+    case ManuallyTerminateStream =>
+      consumerStreamManager ! TerminateConsumerStream(kafkaTopic)
+      sender() ! ConsumerActorReply("Data Consumer Stream Stopped")
 
-        case other => log.error("Data Consumer got Unknown message while in consuming " + other)
-    }
+    case other => log.error("Data Consumer got Unknown message while in consuming " + other)
+  }
 }
