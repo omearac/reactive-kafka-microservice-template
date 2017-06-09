@@ -1,3 +1,5 @@
+import sbt._
+
 object Dependencies {
   val kafka = "com.typesafe.akka" %% "akka-stream-kafka" % Versions.akka
 
