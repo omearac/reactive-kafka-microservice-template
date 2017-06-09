@@ -3,6 +3,8 @@ object Versions {
   val akka = "2.4.16"
 
   val akka_http = "10.0.1"
+  
+  val akka_kafka = "0.13"
 
   val logback = "1.1.3"
 
@@ -12,5 +14,5 @@ object Versions {
 
   val play_json = "2.4.0-M2"
 
-  val scalatest = "test"
+  val scalatest = "3.0.1"
 }
